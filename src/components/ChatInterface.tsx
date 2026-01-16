@@ -276,6 +276,9 @@ export const ChatInterface: React.FC = () => {
                         Procesar Instrucción
                     </Button>
                 </div>
+                <div style={{ textAlign: 'center', marginTop: 10, opacity: 0.3, fontSize: '0.7em' }}>
+                    v1.0.2
+                </div>
             </Card>
 
             {/* Modals remain the same ... */}
