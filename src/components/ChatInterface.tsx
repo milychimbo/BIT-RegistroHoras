@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useMsal } from "@azure/msal-react";
 import { Button, Input, Card, message, Modal, List } from 'antd';
 import { AudioOutlined, SendOutlined } from '@ant-design/icons';
 import { sendMessageToAgent } from '../api/aiService';
@@ -27,8 +26,8 @@ const getSpeechConfig = () => {
 };
 
 
+
 export const ChatInterface: React.FC = () => {
-    const { instance, accounts } = useMsal();
     const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(false);
     const [confirmModalVisible, setConfirmModalVisible] = useState(false);
