@@ -17,9 +17,23 @@ const httpClient = axios.create({
     baseURL: '/api/ai-proxy', // Apunta a tu Endpoint via Proxy
 });
 
-// -------------------- Auth (Delegated to UI/MSAL) --------------------
-// getAccessTokenAsync removed as we now use MSAL token from frontend
+// -------------------- Auth (Igual a GetAccessTokenAsync) --------------------
+async function getAccessTokenAsync(): Promise<string> {
+    const params = new URLSearchParams();
+    params.append('client_id', aiOptions.clientId);
+    params.append('client_secret', aiOptions.clientSecret);
+    params.append('scope', 'https://ai.azure.com/.default');
+    params.append('grant_type', 'client_credentials');
 
+    // Usamos proxy para Auth también
+    // Nota: La ruta del proxy ahora se maneja via Vercel Function
+    const response = await axios.post(
+        `/api/auth-proxy/${aiOptions.tenantId}/oauth2/v2.0/token`,
+        params.toString(),
+        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    return response.data.access_token;
+}
 
 // -------------------- Threads API calls (Igual a tu C#) --------------------
 
@@ -94,15 +108,12 @@ async function getLatestAssistantTextAsync(token: string, threadId: string): Pro
     return "";
 }
 
-
 // -------------------- Public Method (FixPromptAsync equivalente) --------------------
 
-export const sendMessageToAgent = async (token: string, text: string): Promise<string | null> => {
+export const sendMessageToAgent = async (text: string): Promise<string | null> => {
     try {
-        // Token is passed from UI (MSAL)
-
-        console.log("1. (Token recibido desde UI)");
-        // const token = await getAccessTokenAsync(); // REMOVED
+        console.log("1. Obteniendo Token (Proxy)...");
+        const token = await getAccessTokenAsync();
 
         console.log("2. Creando Thread...");
         const threadId = await createThreadAsync(token);

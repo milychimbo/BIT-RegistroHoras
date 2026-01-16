@@ -43,13 +43,8 @@ export const ChatInterface: React.FC = () => {
         if (!inputText.trim()) return;
         setLoading(true);
         try {
-            // Get User Token for AI
-            const tokenResponse = await instance.acquireTokenSilent({
-                scopes: ["https://cognitiveservices.azure.com/.default"], // Correct scope for Azure AI Services
-                account: accounts[0]
-            });
-
-            const responseText = await sendMessageToAgent(tokenResponse.accessToken, inputText);
+            // Revertido a Proxy Auth (client_credentials) para evitar error de consentimiento
+            const responseText = await sendMessageToAgent(inputText);
             if (responseText) {
                 // ... rest of code
                 let cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -287,7 +282,7 @@ export const ChatInterface: React.FC = () => {
                     </Button>
                 </div>
                 <div style={{ textAlign: 'center', marginTop: 10, opacity: 0.3, fontSize: '0.7em' }}>
-                    v1.0.3
+                    v1.0.4
                 </div>
             </Card>
 
