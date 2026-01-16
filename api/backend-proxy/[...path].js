@@ -15,11 +15,12 @@ export default async function handler(req, res) {
     }
 
     const { path } = req.query;
-    if (!path) {
+    const joinedPath = Array.isArray(path) ? path.join('/') : path;
+
+    if (!joinedPath) {
         return res.status(400).json({ error: 'Path not provided' });
     }
 
-    const joinedPath = Array.isArray(path) ? path.join('/') : path;
     const targetBase = 'https://registrohorasback.azurewebsites.net';
     const targetUrl = `${targetBase}/${joinedPath}`;
 
@@ -35,7 +36,6 @@ export default async function handler(req, res) {
             headers: {
                 'Content-Type': req.headers['content-type'] || 'application/json',
                 'Authorization': req.headers['authorization'],
-                // Strip Origin
                 'Origin': undefined,
             },
             validateStatus: () => true

@@ -1,7 +1,6 @@
 import axios from 'axios';
 
 export default async function handler(req, res) {
-    // Config allow CORS
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -16,12 +15,12 @@ export default async function handler(req, res) {
     }
 
     const { path } = req.query;
-    if (!path) {
+    const joinedPath = Array.isArray(path) ? path.join('/') : path;
+
+    if (!joinedPath) {
         return res.status(400).json({ error: 'Path not provided' });
     }
 
-    const joinedPath = Array.isArray(path) ? path.join('/') : path;
-    // Use correct Azure AI endpoint
     const targetBase = 'https://frcorregidorprompts.services.ai.azure.com';
     const targetUrl = `${targetBase}/${joinedPath}`;
 
@@ -38,7 +37,6 @@ export default async function handler(req, res) {
                 'Content-Type': req.headers['content-type'] || 'application/json',
                 'api-key': req.headers['api-key'],
                 'Authorization': req.headers['authorization'],
-                // Strip Origin
                 'Origin': undefined,
             },
             validateStatus: () => true

@@ -1,18 +1,6 @@
 {
     "rewrites": [
         {
-            "source": "/api/auth-proxy/(.*)",
-            "destination": "/api/auth.js?path=$1"
-        },
-        {
-            "source": "/api/ai-proxy/(.*)",
-            "destination": "/api/ai.js?path=$1"
-        },
-        {
-            "source": "/api/backend-proxy/(.*)",
-            "destination": "/api/backend.js?path=$1"
-        },
-        {
             "source": "/((?!api/.*).*)",
             "destination": "/index.html"
         }
