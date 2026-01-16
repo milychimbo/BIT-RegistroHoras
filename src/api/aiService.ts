@@ -107,12 +107,15 @@ async function getLatestAssistantTextAsync(token: string, threadId: string): Pro
     return "";
 }
 
+
 // -------------------- Public Method (FixPromptAsync equivalente) --------------------
 
-export const sendMessageToAgent = async (text: string): Promise<string | null> => {
+export const sendMessageToAgent = async (token: string, text: string): Promise<string | null> => {
     try {
-        console.log("1. Obteniendo Token...");
-        const token = await getAccessTokenAsync();
+        // Token is passed from UI (MSAL)
+
+        console.log("1. (Token recibido desde UI)");
+        // const token = await getAccessTokenAsync(); // REMOVED
 
         console.log("2. Creando Thread...");
         const threadId = await createThreadAsync(token);

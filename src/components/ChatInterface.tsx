@@ -25,7 +25,12 @@ const getSpeechConfig = () => {
     return speechConfig;
 };
 
+import { useMsal } from "@azure/msal-react";
+import { sendMessageToAgent } from '../api/aiService';
+// ... other imports ...
+
 export const ChatInterface: React.FC = () => {
+    const { instance, accounts } = useMsal();
     const [inputText, setInputText] = useState('');
     const [loading, setLoading] = useState(false);
     const [confirmModalVisible, setConfirmModalVisible] = useState(false);
@@ -40,8 +45,15 @@ export const ChatInterface: React.FC = () => {
         if (!inputText.trim()) return;
         setLoading(true);
         try {
-            const responseText = await sendMessageToAgent(inputText);
+            // Get User Token for AI
+            const tokenResponse = await instance.acquireTokenSilent({
+                scopes: ["https://cognitiveservices.azure.com/.default"], // Correct scope for Azure AI Services
+                account: accounts[0]
+            });
+
+            const responseText = await sendMessageToAgent(tokenResponse.accessToken, inputText);
             if (responseText) {
+                // ... rest of code
                 let cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
                 const aiData = JSON.parse(cleanJson);
                 processAiResponse(aiData);
@@ -277,7 +289,7 @@ export const ChatInterface: React.FC = () => {
                     </Button>
                 </div>
                 <div style={{ textAlign: 'center', marginTop: 10, opacity: 0.3, fontSize: '0.7em' }}>
-                    v1.0.2
+                    v1.0.3
                 </div>
             </Card>
 
