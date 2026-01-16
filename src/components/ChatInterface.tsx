@@ -282,7 +282,7 @@ export const ChatInterface: React.FC = () => {
                     </Button>
                 </div>
                 <div style={{ textAlign: 'center', marginTop: 10, opacity: 0.3, fontSize: '0.7em' }}>
-                    v1.0.4
+                    v1.0.5
                 </div>
             </Card>
 
