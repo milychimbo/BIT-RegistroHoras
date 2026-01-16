@@ -1,18 +1,6 @@
 {
     "rewrites": [
         {
-            "source": "/api/auth-proxy/:match*",
-            "destination": "https://login.microsoftonline.com/:match*"
-        },
-        {
-            "source": "/api/ai-proxy/:match*",
-            "destination": "https://frcorregidorprompts.services.ai.azure.com/:match*"
-        },
-        {
-            "source": "/api/backend-proxy/:match*",
-            "destination": "https://registrohorasback.azurewebsites.net/:match*"
-        },
-        {
             "source": "/(.*)",
             "destination": "/index.html"
         }
