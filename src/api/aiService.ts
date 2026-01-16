@@ -17,22 +17,9 @@ const httpClient = axios.create({
     baseURL: '/api/ai-proxy', // Apunta a tu Endpoint via Proxy
 });
 
-// -------------------- Auth (Igual a GetAccessTokenAsync) --------------------
-async function getAccessTokenAsync(): Promise<string> {
-    const params = new URLSearchParams();
-    params.append('client_id', aiOptions.clientId);
-    params.append('client_secret', aiOptions.clientSecret);
-    params.append('scope', 'https://ai.azure.com/.default');
-    params.append('grant_type', 'client_credentials');
+// -------------------- Auth (Delegated to UI/MSAL) --------------------
+// getAccessTokenAsync removed as we now use MSAL token from frontend
 
-    // Usamos proxy para Auth también
-    const response = await axios.post(
-        `/api/auth-proxy/${aiOptions.tenantId}/oauth2/v2.0/token`,
-        params.toString(),
-        { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
-    );
-    return response.data.access_token;
-}
 
 // -------------------- Threads API calls (Igual a tu C#) --------------------
 
