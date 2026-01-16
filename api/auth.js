@@ -17,7 +17,6 @@ export default async function handler(req, res) {
     const { path } = req.query;
     const joinedPath = Array.isArray(path) ? path.join('/') : path;
 
-    // Si no hay path, quizás es la raíz del proxy, manejar según corresponda o error
     if (!joinedPath) {
         return res.status(400).json({ error: 'Path not provided' });
     }
