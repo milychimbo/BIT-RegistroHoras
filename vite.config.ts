@@ -4,8 +4,9 @@ import basicSsl from '@vitejs/plugin-basic-ssl'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react(), basicSsl()],
+  plugins: [react()],
   server: {
+    port: 4200,
     proxy: {
       '/api/auth-proxy': {
         target: 'https://login.microsoftonline.com',

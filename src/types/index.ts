@@ -37,3 +37,28 @@ export interface AIResponse {
     observacion: string | null;
     fecharegistro: string | null;
 }
+
+export interface Activity {
+    id: number;
+    titulo: string;
+    guid: string;
+    horas: number;
+    observacion: string;
+    creadopor: string;
+    creado: string;
+    fecharegistro: string;
+    cliente: string;
+    comercial: string;
+    estado: string;
+    areaInterna: string;
+    subAreas: string;
+    areaSolicitante: string;
+    numeroTicket: string;
+    tipoActividad: string;
+    tipoHora: string;
+    equipos: string;
+    rutaSoportes: string;
+    descripcionRequerimiento: string;
+    proyectoCliente: string;
+    faseDesarrollo: string;
+}
