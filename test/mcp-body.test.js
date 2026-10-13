@@ -26,4 +26,11 @@ test('compressed discovery works but activity calls require OAuth', async () => 
   assert.equal((await list.json()).result.tools.length, 5);
   const denied = await handle(request(JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'obtener_mi_actividad', arguments: { id: 1 } } })));
   assert.equal(denied.status, 401);
+  for (const payload of ['', '{']) {
+    const probe = request(payload);
+    probe.headers.set('content-type', 'application/octet-stream');
+    const challenge = await handle(probe);
+    assert.equal(challenge.status, 401);
+    assert.match(challenge.headers.get('www-authenticate'), /resource_metadata="https:\/\/example.com\/\.well-known\/oauth-protected-resource"/);
+  }
 });
