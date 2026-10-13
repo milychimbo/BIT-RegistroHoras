@@ -5,6 +5,11 @@ import { buildServer } from '../lib/mcp-tools.js';
 
 const MAX_BODY = 1048576;
 const headers = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' };
+function authenticationRequired(base) {
+  return Response.json({ error: 'invalid_token', message: 'Reconecta Registro de Horas e inicia sesión con Microsoft.' }, {
+    status: 401, headers: { ...headers, 'WWW-Authenticate': `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource", scope="activities"` }
+  });
+}
 export async function parseBody(request) {
   const reader = request.body?.getReader();
   if (!reader) throw new Error('missing_body');
@@ -39,6 +44,10 @@ export async function handle(request) {
     catch (error) {
       console.info(JSON.stringify({ event: 'mcp_parse_failed', error_type: error.name,
         content_type: request.headers.get('content-type'), content_encoding: request.headers.get('content-encoding') || 'identity' }));
+      // OAuth discovery probes may have an empty/non-JSON body. Authenticate
+      // before reporting a payload error, so the client can discover OAuth.
+      try { await session({ headers: { authorization: request.headers.get('authorization') || '' } }); }
+      catch { return authenticationRequired(base); }
       return Response.json({ error: 'invalid_json' }, { status: 400, headers });
     }
   }
@@ -50,9 +59,7 @@ export async function handle(request) {
   if (!discovery) {
     try { identity = await session({ headers: { authorization: request.headers.get('authorization') || '' } }); }
     catch {
-      return Response.json({ error: 'invalid_token', message: 'Reconecta Registro de Horas e inicia sesión con Microsoft.' }, {
-        status: 401, headers: { ...headers, 'WWW-Authenticate': `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource", scope="activities", error="invalid_token"` }
-      });
+      return authenticationRequired(base);
     }
   }
   if (request.method !== 'POST') return Response.json({ error: 'method_not_allowed' }, { status: 405, headers });
