@@ -8,7 +8,7 @@ function request(bytes, encoding = 'identity') {
 }
 test('normal and compressed JSON normalize identically with bounded decoding', async () => {
   const text = JSON.stringify(body);
-  for (const [encoding, bytes] of [['identity', text], ['gzip', gzipSync(text)], ['deflate', deflateSync(text)], ['br', brotliCompressSync(text)], ['gzip', text]]) {
+  for (const [encoding, bytes] of [['identity', text], ['gzip', gzipSync(text)], ['deflate', deflateSync(text)], ['br', brotliCompressSync(text)], ['gzip', text], ['identity', gzipSync(text)], ['identity', deflateSync(text)]]) {
     assert.deepEqual(await parseBody(request(bytes, encoding)), body);
   }
   await assert.rejects(parseBody(request('{')));
