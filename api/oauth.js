@@ -1,5 +1,24 @@
 import { opaque, digest, equal, redis, encrypt, validateMicrosoftToken, origin, securityHeaders } from '../lib/mcp-security.js';
 
+export async function tokenBody(req) {
+  let body = req.body;
+  if (body === undefined) {
+    const chunks = []; let size = 0;
+    for await (const chunk of req) {
+      size += Buffer.byteLength(chunk);
+      if (size > 65536) throw new Error('body_too_large');
+      chunks.push(Buffer.from(chunk));
+    }
+    body = Buffer.concat(chunks);
+  }
+  if (Buffer.isBuffer(body) || body instanceof Uint8Array) body = Buffer.from(body).toString('utf8');
+  if (typeof body === 'string') {
+    if (body.trimStart().startsWith('{')) return JSON.parse(body);
+    return Object.fromEntries(new URLSearchParams(body));
+  }
+  return body || {};
+}
+
 export default async function handler(req, res) {
   securityHeaders(res);
   try {
@@ -57,13 +76,20 @@ export default async function handler(req, res) {
       return res.json({ redirect: next.toString() });
     }
     if (action === 'token' && req.method === 'POST') {
-      const b = typeof req.body === 'string' ? Object.fromEntries(new URLSearchParams(req.body)) : req.body || {};
+      const b = await tokenBody(req);
       let client = b.client_id, secret = b.client_secret;
       if (req.headers.authorization?.startsWith('Basic ')) {
         const pair = Buffer.from(req.headers.authorization.slice(6), 'base64').toString('utf8');
         const i = pair.indexOf(':'); client = decodeURIComponent(pair.slice(0, i)); secret = decodeURIComponent(pair.slice(i + 1));
       }
-      if (!equal(client, process.env.MCP_OAUTH_CLIENT_ID) || !equal(secret, process.env.MCP_OAUTH_CLIENT_SECRET)) return res.status(401).json({ error: 'invalid_client' });
+      const clientMatches = equal(client, process.env.MCP_OAUTH_CLIENT_ID);
+      const secretMatches = equal(secret, process.env.MCP_OAUTH_CLIENT_SECRET);
+      console.info(JSON.stringify({ event: 'oauth_token_client', content_type: req.headers['content-type'],
+        has_client: typeof client === 'string' && client.length > 0,
+        has_secret: typeof secret === 'string' && secret.length > 0,
+        client_matches: clientMatches, secret_matches: secretMatches,
+        method: req.headers.authorization?.startsWith('Basic ') ? 'client_secret_basic' : 'client_secret_post' }));
+      if (!clientMatches || !secretMatches) return res.status(401).json({ error: 'invalid_client' });
       if (b.grant_type !== 'authorization_code') return res.status(400).json({ error: 'unsupported_grant_type' });
       if (!/^[A-Za-z0-9_-]{43}$/.test(b.code || '') || !/^[A-Za-z0-9._~-]{43,128}$/.test(b.code_verifier || '')) return res.status(400).json({ error: 'invalid_grant' });
       const record = await db.getdel('mcp:code:' + digest(b.code));
