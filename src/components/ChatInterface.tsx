@@ -500,7 +500,7 @@ export const ChatInterface: React.FC = () => {
                             }}>
                                 <Text style={{ color: 'white', fontWeight: 700, fontSize: '0.9rem' }}>Total Periodo</Text>
                                 <Text style={{ color: '#60a5fa', fontWeight: 800, fontSize: '1rem' }}>
-                                    {getFilteredSummary().reduce((acc, [_, h]) => acc + h, 0).toFixed(2)}h
+                                    {getFilteredSummary().reduce<number>((acc, [, h]) => acc + Number(h), 0).toFixed(2)}h
                                 </Text>
                             </div>
                         }

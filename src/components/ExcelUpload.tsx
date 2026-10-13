@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Modal, List, Button, Input, message, Tag, Progress, Typography, Divider, Upload } from 'antd';
+import { Modal, List, Button, Input, message, Tag, Progress, Typography, Divider } from 'antd';
 import { SearchOutlined, FileExcelOutlined, UploadOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import * as XLSX from 'xlsx';
 import { getProjects } from '../api/projectService';
@@ -539,7 +539,7 @@ export const ExcelUpload: React.FC<Props> = ({ visible, onClose, onSuccess }) =>
                     borderRadius: '0 0 16px 16px',
                     padding: '14px 24px'
                 },
-                content: {
+                container: {
                     borderRadius: 16,
                     border: '1px solid rgba(255,255,255,0.1)',
                     overflow: 'hidden',
