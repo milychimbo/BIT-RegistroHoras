@@ -19,6 +19,9 @@ test('compressed discovery works but activity calls require OAuth', async () => 
   const initialized = await handle(request(deflateSync(JSON.stringify(body)), 'deflate'));
   assert.equal(initialized.status, 200);
   assert.equal((await initialized.json()).result.serverInfo.name, 'BIT Registro de Horas');
+  const binaryJson = request(JSON.stringify(body));
+  binaryJson.headers.set('content-type', 'application/octet-stream');
+  assert.equal((await handle(binaryJson)).status, 200);
   const list = await handle(request(JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list' })));
   assert.equal((await list.json()).result.tools.length, 5);
   const denied = await handle(request(JSON.stringify({ jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'obtener_mi_actividad', arguments: { id: 1 } } })));
