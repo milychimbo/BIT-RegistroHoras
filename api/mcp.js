@@ -8,10 +8,13 @@ export default async function handler(req, res) {
   try {
     const base = origin();
     if (req.headers.origin && req.headers.origin !== base) return res.status(403).json({ error: 'invalid_origin' });
-    identity = await session(req);
+    // Only protocol discovery is public; every tools/call still authenticates.
+    const discovery = req.method === 'POST' && req.body && !Array.isArray(req.body) &&
+      ['initialize', 'notifications/initialized', 'tools/list', 'ping'].includes(req.body.method);
+    identity = discovery ? null : await session(req);
   } catch {
     const base = process.env.MCP_PUBLIC_ORIGIN;
-    if (base) res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource", error="invalid_token"`);
+    if (base) res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource", scope="activities", error="invalid_token"`);
     return res.status(401).json({ error: 'invalid_token', message: 'Reconecta Registro de Horas e inicia sesión con Microsoft.' });
   }
   if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
