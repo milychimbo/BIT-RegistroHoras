@@ -3,6 +3,7 @@ import { AuthenticatedTemplate, UnauthenticatedTemplate, useMsal } from "@azure/
 import { ConfigProvider, theme, App as AntApp, Button } from 'antd';
 import { Login } from './pages/Login';
 import { ChatInterface } from './components/ChatInterface';
+import { McpConnect } from './components/McpConnect';
 
 const MainContent: React.FC<{ isGuest?: boolean; exitGuest?: () => void }> = ({ isGuest, exitGuest }) => {
   const { instance, accounts } = useMsal();
@@ -51,7 +52,7 @@ const App: React.FC = () => {
       }}
     >
       <AntApp>
-        {isGuest ? (
+        {new URLSearchParams(window.location.search).has('mcp_connect') ? <McpConnect /> : isGuest ? (
           <MainContent isGuest={true} exitGuest={() => setIsGuest(false)} />
         ) : (
           <>

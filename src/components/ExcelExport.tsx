@@ -181,7 +181,7 @@ export const ExcelExport: React.FC<Props> = ({ visible, onClose, activities }) =
                     borderRadius: '0 0 16px 16px',
                     padding: '14px 24px'
                 },
-                content: {
+                container: {
                     borderRadius: 16,
                     border: '1px solid rgba(255,255,255,0.1)',
                     overflow: 'hidden',
