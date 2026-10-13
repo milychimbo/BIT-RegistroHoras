@@ -29,8 +29,6 @@ export async function parseBody(request) {
 }
 
 export async function handle(request) {
-  console.info(JSON.stringify({ event: 'mcp_received', http_method: request.method,
-    content_type: request.headers.get('content-type'), content_encoding: request.headers.get('content-encoding') || 'identity' }));
   let base;
   try { base = origin(); } catch { return Response.json({ error: 'configuration' }, { status: 503, headers }); }
   const requestOrigin = request.headers.get('origin');
@@ -39,7 +37,8 @@ export async function handle(request) {
   if (request.method === 'POST') {
     try { body = await parseBody(request); }
     catch (error) {
-      console.info(JSON.stringify({ event: 'mcp_parse_failed', error_type: error.name }));
+      console.info(JSON.stringify({ event: 'mcp_parse_failed', error_type: error.name,
+        content_type: request.headers.get('content-type'), content_encoding: request.headers.get('content-encoding') || 'identity' }));
       return Response.json({ error: 'invalid_json' }, { status: 400, headers });
     }
   }
@@ -61,7 +60,17 @@ export async function handle(request) {
   const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);
   try {
-    const response = await transport.handleRequest(request, { parsedBody: body });
+    // Validate and decode the payload first, then give the SDK canonical JSON
+    // headers. Some clients send JSON bytes as application/octet-stream.
+    const canonicalHeaders = new Headers(request.headers);
+    canonicalHeaders.set('content-type', 'application/json');
+    canonicalHeaders.delete('content-encoding');
+    canonicalHeaders.delete('content-length');
+    const canonicalRequest = new Request(request.url, {
+      method: request.method, headers: canonicalHeaders, body: JSON.stringify(body)
+    });
+    const response = await transport.handleRequest(canonicalRequest, { parsedBody: body });
+    console.info(JSON.stringify({ event: 'mcp_response', rpc_method: method, status: response.status }));
     for (const [name, value] of Object.entries(headers)) response.headers.set(name, value);
     return response;
   } finally { await transport.close(); await server.close(); }
