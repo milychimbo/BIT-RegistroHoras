@@ -24,11 +24,17 @@ export async function parseBody(request) {
     }
   } finally { reader.releaseLock(); }
   let bytes = Buffer.concat(chunks);
+  if (!bytes.length) throw new Error('empty_body');
   const encoding = (request.headers.get('content-encoding') || 'identity').toLowerCase();
   if (!['identity', 'gzip', 'deflate', 'br'].includes(encoding)) throw new Error('unsupported_encoding');
   // Some gateways decode the body while retaining its encoding header.
   try { return JSON.parse(bytes.toString('utf8')); } catch { /* decode below */ }
-  const decode = { gzip: gunzipSync, deflate: inflateSync, br: brotliDecompressSync }[encoding];
+  // Preserve interoperability when a proxy removes Content-Encoding without
+  // decoding the bytes. Only infer formats with an identifiable header.
+  const inferred = bytes[0] === 0x1f && bytes[1] === 0x8b ? 'gzip' :
+    bytes.length >= 2 && (bytes[0] & 0x0f) === 8 && (bytes[0] >> 4) <= 7 &&
+      ((bytes[0] << 8) + bytes[1]) % 31 === 0 ? 'deflate' : 'identity';
+  const decode = { gzip: gunzipSync, deflate: inflateSync, br: brotliDecompressSync }[encoding === 'identity' ? inferred : encoding];
   if (decode) bytes = decode(bytes, { maxOutputLength: MAX_BODY });
   return JSON.parse(bytes.toString('utf8'));
 }
@@ -42,12 +48,16 @@ export async function handle(request) {
   if (request.method === 'POST') {
     try { body = await parseBody(request); }
     catch (error) {
-      console.info(JSON.stringify({ event: 'mcp_parse_failed', error_type: error.name,
-        content_type: request.headers.get('content-type'), content_encoding: request.headers.get('content-encoding') || 'identity' }));
       // OAuth discovery probes may have an empty/non-JSON body. Authenticate
       // before reporting a payload error, so the client can discover OAuth.
       try { await session({ headers: { authorization: request.headers.get('authorization') || '' } }); }
-      catch { return authenticationRequired(base); }
+      catch {
+        console.info(JSON.stringify({ event: 'mcp_auth_challenge', status: 401,
+          body_issue: ['empty_body', 'missing_body', 'body_too_large', 'unsupported_encoding'].includes(error.message) ? error.message : 'invalid_json',
+          content_type: request.headers.get('content-type') }));
+        return authenticationRequired(base);
+      }
+      console.info(JSON.stringify({ event: 'mcp_parse_failed', status: 400, error_type: error.name }));
       return Response.json({ error: 'invalid_json' }, { status: 400, headers });
     }
   }
