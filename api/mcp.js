@@ -20,9 +20,16 @@ export async function parseBody(req) {
 
 export default async function handler(req, res) {
   securityHeaders(res);
+  console.info(JSON.stringify({ event: 'mcp_received', http_method: req.method,
+    content_type: String(req.headers['content-type'] || '').slice(0, 120),
+    content_encoding: String(req.headers['content-encoding'] || 'identity').slice(0, 40),
+    content_length: String(req.headers['content-length'] || '').slice(0, 20) }));
   let body;
   try { body = await parseBody(req); }
-  catch { return res.status(400).json({ error: 'invalid_json' }); }
+  catch (error) {
+    console.info(JSON.stringify({ event: 'mcp_parse_failed', error_type: error.name }));
+    return res.status(400).json({ error: 'invalid_json' });
+  }
   // Protocol diagnostics only: never emit headers, params, tokens or user data.
   const method = typeof body?.method === 'string' ? body.method.slice(0, 80) : 'unknown';
   console.info(JSON.stringify({ event: 'mcp_request', rpc_method: method, body_type: typeof req.body, has_authorization: Boolean(req.headers.authorization) }));
