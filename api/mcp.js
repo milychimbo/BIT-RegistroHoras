@@ -1,55 +1,70 @@
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { session, origin, securityHeaders } from '../lib/mcp-security.js';
+import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js';
+import { gunzipSync, inflateSync, brotliDecompressSync } from 'node:zlib';
+import { session, origin } from '../lib/mcp-security.js';
 import { buildServer } from '../lib/mcp-tools.js';
 
-export async function parseBody(req) {
-  let body = req.body;
-  if (body == null && req.method === 'POST') {
-    const chunks = []; let size = 0;
-    for await (const chunk of req) {
-      size += chunk.length;
-      if (size > 1048576) throw new Error('request_too_large');
-      chunks.push(chunk);
+const MAX_BODY = 1048576;
+const headers = { 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer', 'X-Content-Type-Options': 'nosniff' };
+export async function parseBody(request) {
+  const reader = request.body?.getReader();
+  if (!reader) throw new Error('missing_body');
+  const chunks = []; let size = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > MAX_BODY) { await reader.cancel(); throw new Error('body_too_large'); }
+      chunks.push(Buffer.from(value));
     }
-    body = Buffer.concat(chunks).toString('utf8');
-  }
-  if (Buffer.isBuffer(body)) body = body.toString('utf8');
-  if (typeof body === 'string') body = JSON.parse(body);
-  return body;
+  } finally { reader.releaseLock(); }
+  let bytes = Buffer.concat(chunks);
+  const encoding = (request.headers.get('content-encoding') || 'identity').toLowerCase();
+  if (!['identity', 'gzip', 'deflate', 'br'].includes(encoding)) throw new Error('unsupported_encoding');
+  // Some gateways decode the body while retaining its encoding header.
+  try { return JSON.parse(bytes.toString('utf8')); } catch { /* decode below */ }
+  const decode = { gzip: gunzipSync, deflate: inflateSync, br: brotliDecompressSync }[encoding];
+  if (decode) bytes = decode(bytes, { maxOutputLength: MAX_BODY });
+  return JSON.parse(bytes.toString('utf8'));
 }
 
-export default async function handler(req, res) {
-  securityHeaders(res);
-  console.info(JSON.stringify({ event: 'mcp_received', http_method: req.method,
-    content_type: String(req.headers['content-type'] || '').slice(0, 120),
-    content_encoding: String(req.headers['content-encoding'] || 'identity').slice(0, 40),
-    content_length: String(req.headers['content-length'] || '').slice(0, 20) }));
+export async function handle(request) {
+  console.info(JSON.stringify({ event: 'mcp_received', http_method: request.method,
+    content_type: request.headers.get('content-type'), content_encoding: request.headers.get('content-encoding') || 'identity' }));
+  let base;
+  try { base = origin(); } catch { return Response.json({ error: 'configuration' }, { status: 503, headers }); }
+  const requestOrigin = request.headers.get('origin');
+  if (requestOrigin && requestOrigin !== base) return Response.json({ error: 'invalid_origin' }, { status: 403, headers });
   let body;
-  try { body = await parseBody(req); }
-  catch (error) {
-    console.info(JSON.stringify({ event: 'mcp_parse_failed', error_type: error.name }));
-    return res.status(400).json({ error: 'invalid_json' });
+  if (request.method === 'POST') {
+    try { body = await parseBody(request); }
+    catch (error) {
+      console.info(JSON.stringify({ event: 'mcp_parse_failed', error_type: error.name }));
+      return Response.json({ error: 'invalid_json' }, { status: 400, headers });
+    }
   }
-  // Protocol diagnostics only: never emit headers, params, tokens or user data.
   const method = typeof body?.method === 'string' ? body.method.slice(0, 80) : 'unknown';
-  console.info(JSON.stringify({ event: 'mcp_request', rpc_method: method, body_type: typeof req.body, has_authorization: Boolean(req.headers.authorization) }));
-  let identity;
-  try {
-    const base = origin();
-    if (req.headers.origin && req.headers.origin !== base) return res.status(403).json({ error: 'invalid_origin' });
-    // Only protocol discovery is public; every tools/call still authenticates.
-    const discovery = req.method === 'POST' && body && !Array.isArray(body) &&
-      ['initialize', 'notifications/initialized', 'tools/list', 'ping'].includes(body.method);
-    identity = discovery ? null : await session(req);
-  } catch {
-    const base = process.env.MCP_PUBLIC_ORIGIN;
-    if (base) res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource", scope="activities", error="invalid_token"`);
-    return res.status(401).json({ error: 'invalid_token', message: 'Reconecta Registro de Horas e inicia sesión con Microsoft.' });
+  console.info(JSON.stringify({ event: 'mcp_request', rpc_method: method, has_authorization: request.headers.has('authorization') }));
+  const discovery = request.method === 'POST' && body && !Array.isArray(body) &&
+    ['initialize', 'notifications/initialized', 'tools/list', 'ping'].includes(body.method);
+  let identity = null;
+  if (!discovery) {
+    try { identity = await session({ headers: { authorization: request.headers.get('authorization') || '' } }); }
+    catch {
+      return Response.json({ error: 'invalid_token', message: 'Reconecta Registro de Horas e inicia sesión con Microsoft.' }, {
+        status: 401, headers: { ...headers, 'WWW-Authenticate': `Bearer resource_metadata="${base}/.well-known/oauth-protected-resource", scope="activities", error="invalid_token"` }
+      });
+    }
   }
-  if (req.method !== 'POST') return res.status(405).json({ error: 'method_not_allowed' });
+  if (request.method !== 'POST') return Response.json({ error: 'method_not_allowed' }, { status: 405, headers });
   const server = buildServer(identity);
-  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
-  res.on('close', () => { transport.close(); server.close(); });
+  const transport = new WebStandardStreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   await server.connect(transport);
-  await transport.handleRequest(req, res, body);
+  try {
+    const response = await transport.handleRequest(request, { parsedBody: body });
+    for (const [name, value] of Object.entries(headers)) response.headers.set(name, value);
+    return response;
+  } finally { await transport.close(); await server.close(); }
 }
+
+export default { fetch: handle };
